@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Screen Recorder + File System Access API</title>
+</head>
+<body>
+  <button id="start">🎥 Начать запись</button>
+  <button id="stop" disabled>⏹ Остановить запись</button>
+
+  <script>
+    let mediaRecorder;
+    let writableStream;
+
+    document.getElementById('start').addEventListener('click', async () => {
+      try {
+        // 1. Запрос на выбор файла
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: "recording.webm",
+          types: [{
+            description: "WebM Video",
+            accept: { "video/webm": [".webm"] }
+          }]
+        });
+        writableStream = await fileHandle.createWritable();
+
+        // 2. Захват экрана
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+
+        // 3. Настройка MediaRecorder
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data && e.data.size > 0 && writableStream) {
+            await writableStream.write(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          if (writableStream) {
+            await writableStream.close(); // Закрыть файл = сделать валидным
+            writableStream = null;
+          }
+          console.log("Файл сохранён и закрыт ✅");
+        };
+
+        mediaRecorder.start(2000); // каждые 2с отдаёт chunk
+        document.getElementById('start').disabled = true;
+        document.getElementById('stop').disabled = false;
+
+      } catch (err) {
+        console.error("Ошибка:", err);
+      }
+    });
+
+    document.getElementById('stop').addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+        document.getElementById('start').disabled = false;
+        document.getElementById('stop').disabled = true;
+      }
+    });
+  </script>
+</body>
+</html>
